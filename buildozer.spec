@@ -23,5 +23,5 @@ android.ndk = 25b
 android.allow_backup = true
 
 [buildozer]
+warn_on_root = 0
 log_level = 2
-
