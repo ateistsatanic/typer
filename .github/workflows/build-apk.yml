@@ -14,17 +14,16 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Pull buildozer docker image
-      run: docker pull kivy/buildozer:latest
+      run: docker pull ghcr.io/kivy/buildozer:latest
 
-    - name: Build APK in Docker
+    - name: Build APK inside Docker container
       run: |
-        docker run --rm -v ${{ github.workspace }}:/home/user/hostwork kivy/buildozer \
-        buildozer android debug
-      working-directory: ./  # путь к папке с buildozer.spec
+        docker run --rm -v ${{ github.workspace }}:/home/user/hostwork ghcr.io/kivy/buildozer:latest \
+        buildozer -v android debug
+      working-directory: ./  # указать путь к папке с buildozer.spec, если не в корне
 
-    - name: Upload APK Artifact
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: Android-APK
         path: bin/*.apk
-
