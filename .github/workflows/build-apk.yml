@@ -9,16 +9,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build using Kivy Android Docker
-      run: |
-        # Используем Docker для сборки - это надежнее
-        docker run --rm \
-          -v $(pwd):/src \
-          -v buildozer-cache:/root/.buildozer \
-          kivy/buildozer android debug
+    - name: Build APK
+      uses: ArtemSBulgakov/buildozer-action@v1
+      with:
+        target: 'android debug'
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: Android-APK
         path: bin/*.apk
+
