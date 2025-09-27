@@ -1,43 +1,19 @@
-name: Build Android APK
+name: Build APK
 
 on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: crazymax/buildozer:latest
 
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3-pip python3-setuptools git zip unzip openjdk-11-jdk
-        pip3 install buildozer cython
-
-    - name: Setup Android SDK
-      run: |
-        rm -rf ~/.android
-        mkdir -p ~/.android
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O /tmp/tools.zip
-        unzip -q /tmp/tools.zip -d /tmp/
-        mkdir -p ~/.android/cmdline-tools/latest
-        mv /tmp/cmdline-tools/* ~/.android/cmdline-tools/latest/
-        chmod +x ~/.android/cmdline-tools/latest/bin/sdkmanager
-        mkdir -p ~/.android/licenses
-        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
-        ~/.android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/.android "platform-tools"
-        ~/.android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/.android "platforms;android-28"
-        ~/.android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/.android "build-tools;28.0.3"
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     - name: Build APK
       run: |
-        if [ ! -f buildozer.spec ]; then
-          buildozer init
-        fi
-        echo "android.api = 28" >> buildozer.spec
-        echo "android.accept_sdk_license = True" >> buildozer.spec
         buildozer android debug
 
     - name: Upload APK
