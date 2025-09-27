@@ -40,27 +40,19 @@ jobs:
         pip install --upgrade setuptools virtualenv
         pip install buildozer cython
 
-    - name: Set up Android SDK
+    - name: Set up Android SDK (Fixed)
       run: |
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
-        wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
-        unzip commandlinetools-linux-8512546_latest.zip -d ~/.android/
-        mkdir -p ~/.android/cmdline-tools/latest/
-        mv ~/.android/cmdline-tools/* ~/.android/cmdline-tools/latest/
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
+        unzip -q commandlinetools-linux-8512546_latest.zip -d ~/.android/cmdline-tools/
+        mv ~/.android/cmdline-tools/cmdline-tools ~/.android/cmdline-tools/latest
         yes | ~/.android/cmdline-tools/latest/bin/sdkmanager --licenses
         ~/.android/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-29" "build-tools;30.0.3"
 
     - name: Configure Buildozer
       run: |
-        buildozer init
-        # Обновляем buildozer.spec для GitHub Actions
-        cat >> buildozer.spec << EOF
-
-        # GitHub Actions specific settings
-        android.accept_sdk_license = True
-        android.skip_update = False
-        EOF
+        buildozer init || true
 
     - name: Build APK
       run: |
