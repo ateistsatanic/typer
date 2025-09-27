@@ -5,36 +5,18 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3-pip python3-setuptools git zip unzip openjdk-11-jdk
-        pip3 install buildozer cython
+      - uses: actions/checkout@v4
+      - name: Build APK
+        uses: digreatbrian/buildozer-action@v2
+        with:
+          python-version: 3.8
+          buildozer-cmd: buildozer -v android debug
 
-    - name: Setup Android SDK
-      run: |
-        mkdir -p ~/.android
-        touch ~/.android/repositories.cfg
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
-        mkdir -p ~/.android/cmdline-tools
-        unzip -q commandlinetools-linux-8512546_latest.zip -d ~/.android/cmdline-tools/
-        mv ~/.android/cmdline-tools/cmdline-tools ~/.android/cmdline-tools/latest
-        
-        # Accept licenses
-        yes | ~/.android/cmdline-tools/latest/bin/sdkmanager --licenses
-        ~/.android/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-29" "build-tools;29.0.3"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ./bin/*.apk
 
-    - name: Build APK
-      run: |
-        buildozer init
-        buildozer -v android debug
-        
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: Android-APK
-        path: bin/*.apk
