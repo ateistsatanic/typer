@@ -15,45 +15,29 @@ jobs:
         sudo apt-get install -y python3-pip python3-setuptools git zip unzip openjdk-11-jdk
         pip3 install buildozer cython
 
-    - name: Setup Android SDK with exact versions
+    - name: Setup Android SDK
       run: |
-        # Clean setup
         rm -rf ~/.android
         mkdir -p ~/.android
-        
-        # Download tools
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O /tmp/tools.zip
         unzip -q /tmp/tools.zip -d /tmp/
-        
-        # Create correct directory structure
         mkdir -p ~/.android/cmdline-tools/latest
         mv /tmp/cmdline-tools/* ~/.android/cmdline-tools/latest/
         chmod +x ~/.android/cmdline-tools/latest/bin/sdkmanager
-        
-        # Force accept ALL licenses for ALL versions
         mkdir -p ~/.android/licenses
-        cat > ~/.android/licenses/android-sdk-license << EOF
-8933bad161af4178b1185d1a37fbf41ea5269c55
-d56f5187479451eabf01fb78af6dfcb131a6481e
-8415c6c9b53d9c2170d73b3c2d0e6c0e7c0b536
-EOF
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
-        echo "504667f4c0de7af1a06de9f4b1727b84351f2910" > ~/.android/licenses/intel-android-extra-license
-        
-        # Install each component separately with exact versions
+        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
         ~/.android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/.android "platform-tools"
         ~/.android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/.android "platforms;android-28"
         ~/.android/cmdline-tools/latest/bin/sdkmanager --sdk_root=$HOME/.android "build-tools;28.0.3"
 
     - name: Build APK
       run: |
-        # Ensure buildozer.spec has correct settings
         if [ ! -f buildozer.spec ]; then
           buildozer init
         fi
-        # Force Android 28 settings
-        grep -q "android.api" buildozer.spec && sed -i 's/android.api = .*/android.api = 28/' buildozer.spec || echo "android.api = 28" >> buildozer.spec
-        grep -q "android.accept_sdk_license" buildozer.spec || echo "android.accept_sdk_license = True" >> buildozer.spec
+        echo "android.api = 28" >> buildozer.spec
+        echo "android.accept_sdk_license = True" >> buildozer.spec
         buildozer android debug
 
     - name: Upload APK
