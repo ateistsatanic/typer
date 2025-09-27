@@ -8,10 +8,37 @@ from pathlib import Path
 import os
 import threading
 import sys
+import base64
+from kivy.uix.filechooser import FileChooserListView
+from kivy.uix.image import Image
 import pyperclipimg as pci
 import win32gui
 import win32con
 import keyboard as kb_global
+try:
+    from android.permissions import request_permissions, Permission
+    from android.storage import app_storage_path
+    HAS_ANDROID = True
+except:
+    HAS_ANDROID = False
+
+class MobileTyper:
+    def __init__(self):
+        # ... остальной код ...
+        if HAS_ANDROID:
+            self.request_android_permissions()
+    
+    def request_android_permissions(self):
+        """Запрашивает разрешения на Android"""
+        try:
+            request_permissions([
+                Permission.READ_EXTERNAL_STORAGE,
+                Permission.WRITE_EXTERNAL_STORAGE,
+                Permission.CAMERA,
+                Permission.INTERNET
+            ])
+        except:
+            pass
 
 kb = Controller()
 mouse_listener = None
@@ -61,7 +88,24 @@ def on_key_release(key):
                 print("Не запущено.")
     except AttributeError:
         pass
-
+        
+def select_photo_android(self):
+        """Выбор фото на Android"""
+        try:
+            from android import mActivity
+            from jnius import autoclass
+            
+            Intent = autoclass('android.content.Intent')
+            Uri = autoclass('android.net.Uri')
+            
+            intent = Intent(Intent.ACTION_PICK)
+            intent.setType("image/*")
+            
+            mActivity.startActivityForResult(intent, 100)
+            return True
+        except:
+            return False
+            
 def calculate_char_delay(wpm):
     """Рассчитывает задержку между символами на основе WPM"""
     return 60.0 / (wpm * 5)
@@ -432,3 +476,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
