@@ -12,7 +12,9 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3-pip python3-setuptools git zip unzip openjdk-11-jdk libncurses5
+        sudo apt-get install -y python3-pip python3-setuptools git zip unzip openjdk-11-jdk
+        curl -O http://archive.ubuntu.com/ubuntu/pool/main/n/ncurses/libtinfo5_6.4-2_amd64.deb
+        sudo dpkg -i libtinfo5_6.4-2_amd64.deb
         pip3 install buildozer cython
 
     - name: Setup Android SDK
@@ -36,3 +38,4 @@ jobs:
       with:
         name: Android-APK
         path: bin/*.apk
+
