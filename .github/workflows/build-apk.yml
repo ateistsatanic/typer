@@ -16,7 +16,7 @@ jobs:
     - name: Pull buildozer docker image
       run: docker pull ghcr.io/kivy/buildozer:latest
 
-    - name: Build APK inside Docker container
+    - name: Build APK inside Docker container (non-interactive)
       run: |
         docker run --rm -v ${{ github.workspace }}:/home/user/hostwork ghcr.io/kivy/buildozer:latest \
         buildozer --quiet android debug
@@ -27,4 +27,5 @@ jobs:
       with:
         name: Android-APK
         path: bin/*.apk
+
 
