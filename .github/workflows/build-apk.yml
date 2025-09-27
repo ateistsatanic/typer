@@ -1,0 +1,107 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          git \
+          zip \
+          unzip \
+          openjdk-11-jdk \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev \
+          python3-pip
+          
+    - name: Install Buildozer and dependencies
+      run: |
+        pip install buildozer
+        pip install Cython==0.29.33
+        pip install kivy==2.3.1
+        pip install requests==2.31.0
+        
+    - name: Initialize Buildozer
+      run: |
+        buildozer init
+        # Обновляем buildozer.spec если нужно
+        cat >> buildozer.spec << EOF
+
+[app]
+title = Автотайпер
+package.name = autotyper
+package.domain = org.ateistsatanic
+
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas,txt
+
+version = 1.0
+requirements = python3,kivy,requests,android
+
+orientation = portrait
+
+[buildozer]
+log_level = 2
+
+[app]
+android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+android.api = 30
+android.minapi = 21
+android.ndk = 23b
+EOF
+        
+    - name: Build APK
+      run: |
+        buildozer -v android debug
+        ls -la bin/
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: autotyper-apk
+        path: bin/*.apk
+        retention-days: 30
+        
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: bin/*.apk
+        tag_name: v1.0.${{ github.run_number }}
+        name: Autotyper v1.0.${{ github.run_number }}
+        body: |
+          Автоматическая сборка APK
+          
+          Собрано: ${{ github.event.head_commit.timestamp }}
+          Коммит: ${{ github.sha }}
+          
+          Режимы работы:
+          - 📝 Текст с ошибками
+          - 🖼️ Фото + текст  
+          - 🔤 Слова отдельно
