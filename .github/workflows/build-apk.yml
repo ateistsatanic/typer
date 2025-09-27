@@ -13,24 +13,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python (опционально, если нужен)
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'  # в зависимости от необходимости
+    - name: Pull buildozer docker image
+      run: docker pull kivy/buildozer:latest
 
-    - name: Build APK with Buildozer
-      uses: ArtemSBulgakov/buildozer-action@v1
-      id: buildozer
-      with:
-        # Указываем команду buildozer без 'target', просто через параметр command
-        command: android debug
-        # Путь к приложению, если не в корне репозитория
-        # workdir: путь_к_папке_с_приложением
-        buildozer_version: stable
+    - name: Build APK in Docker
+      run: |
+        docker run --rm -v ${{ github.workspace }}:/home/user/hostwork kivy/buildozer \
+        buildozer android debug
+      working-directory: ./  # путь к папке с buildozer.spec
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Android-APK
-        # Путь к APK билду. buildozer-action выводит путь в выходном параметре filename
-        path: ${{ steps.buildozer.outputs.filename }}
+        path: bin/*.apk
+
