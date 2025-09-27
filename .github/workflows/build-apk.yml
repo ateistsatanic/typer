@@ -1,28 +1,61 @@
-name: Build APK
+name: Build Android APK
+
 on: [push, pull_request]
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install tools
-        run: |
-          sudo apt update
-          sudo apt install -y python3-pip openjdk-11-jdk git zip unzip
-          pip3 install buildozer cython
-      - name: Setup Android SDK
-        run: |
-          mkdir -p ~/.android
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
-          mkdir -p ~/.android/cmdline-tools/latest
-          unzip -q commandlinetools-linux-8512546_latest.zip -d ~/.android/cmdline-tools/latest/
-          yes | ~/.android/cmdline-tools/latest/bin/sdkmanager --licenses
-          ~/.android/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-29" "build-tools;29.0.3"
-      - name: Build
-        run: buildozer android debug
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: APK
-          path: bin/*.apk
 
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-pip python3-setuptools git zip unzip openjdk-11-jdk
+        pip3 install buildozer cython
+
+    - name: Setup Android SDK (Fixed paths)
+      run: |
+        mkdir -p ~/.android
+        touch ~/.android/repositories.cfg
+        
+        # Download command line tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
+        
+        # Create directory and extract
+        mkdir -p ~/.android/cmdline-tools
+        unzip -q commandlinetools-linux-8512546_latest.zip -d ~/.android/cmdline-tools/
+        
+        # Check what was extracted and fix path
+        echo "=== Checking extracted files ==="
+        ls -la ~/.android/cmdline-tools/
+        
+        # The extracted folder should be moved to 'latest'
+        mv ~/.android/cmdline-tools/cmdline-tools ~/.android/cmdline-tools/latest
+        
+        echo "=== Checking final structure ==="
+        ls -la ~/.android/cmdline-tools/latest/bin/
+        
+        # Verify sdkmanager exists
+        if [ -f ~/.android/cmdline-tools/latest/bin/sdkmanager ]; then
+            echo "sdkmanager found successfully"
+        else
+            echo "sdkmanager not found, checking alternative locations..."
+            find ~/.android -name "sdkmanager" -type f
+            exit 1
+        fi
+        
+        # Accept licenses and install packages
+        yes | ~/.android/cmdline-tools/latest/bin/sdkmanager --licenses
+        ~/.android/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-29" "build-tools;29.0.3"
+
+    - name: Build APK
+      run: |
+        buildozer -v android debug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Android-APK
+        path: bin/*.apk
