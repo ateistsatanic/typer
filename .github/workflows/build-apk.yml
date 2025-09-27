@@ -20,7 +20,7 @@ jobs:
       run: |
         docker run --rm -v ${{ github.workspace }}:/home/user/hostwork ghcr.io/kivy/buildozer:latest \
         buildozer --quiet android debug
-      working-directory: ./  # укажи путь к папке с buildozer.spec, если не в корне
+      working-directory: ./  # укажи путь к папке с buildozer.spec, если он не в корне проекта
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
