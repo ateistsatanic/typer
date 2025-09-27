@@ -1,22 +1,36 @@
 name: Build APK
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - name: Build APK
-      uses: ArtemSBulgakov/buildozer-action@v1
+    - name: Set up Python (опционально, если нужен)
+      uses: actions/setup-python@v5
       with:
-        target: 'android debug'
+        python-version: '3.x'  # в зависимости от необходимости
 
-    - name: Upload APK
+    - name: Build APK with Buildozer
+      uses: ArtemSBulgakov/buildozer-action@v1
+      id: buildozer
+      with:
+        # Указываем команду buildozer без 'target', просто через параметр command
+        command: android debug
+        # Путь к приложению, если не в корне репозитория
+        # workdir: путь_к_папке_с_приложением
+        buildozer_version: stable
+
+    - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: Android-APK
-        path: bin/*.apk
-
+        # Путь к APK билду. buildozer-action выводит путь в выходном параметре filename
+        path: ${{ steps.buildozer.outputs.filename }}
