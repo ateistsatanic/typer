@@ -18,16 +18,25 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Шаг 2: Установка Android SDK и build-tools
-      - name: Setup Android SDK and Build Tools
+      # Шаг 2: Установка Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          build-tools-version: "34.0.0"  # Явно указываем версию
 
-      # Шаг 3: Декодирование Keystore из base64
-      - name: Decode Keystore
+      # Шаг 3: Декодирование и КОНВЕРТАЦИЯ Keystore
+      - name: Decode and Convert Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.jks
+          
+          # Конвертируем JKS в PKCS12 и обратно в старый формат JKS
+          keytool -importkeystore \
+            -srckeystore android.jks \
+            -srcstorepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -destkeystore android_fixed.jks \
+            -deststorepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -deststoretype JKS
+          
+          # Проверяем что конвертация прошла успешно
+          keytool -list -v -keystore android_fixed.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}"
           
       # Шаг 4: Сборка APK через Buildozer
       - name: Build Release APK
@@ -36,22 +45,17 @@ jobs:
           python-version: 3.11
           buildozer-cmd: buildozer -v android release
 
-      # Шаг 5: Подписание APK через apksigner (ИСПРАВЛЕННЫЙ ВАРИАНТ)
+      # Шаг 5: Подписание APK через apksigner с КОНВЕРТИРОВАННЫМ keystore
       - name: Sign the APK with apksigner
         run: |
-          # Правильный путь к build-tools
           BUILD_TOOLS_DIR="$ANDROID_HOME/build-tools/34.0.0"
-          echo "Using build-tools: $BUILD_TOOLS_DIR"
-          
           APK_PATH=$(find ./bin -name "*-release-unsigned.apk" | head -n 1)
           SIGNED_APK_PATH="${APK_PATH/-unsigned/-signed}"
           
           echo "Signing APK: $APK_PATH"
-          echo "Output: $SIGNED_APK_PATH"
           
-          # Подписываем через apksigner
           $BUILD_TOOLS_DIR/apksigner sign \
-            --ks android.jks \
+            --ks android_fixed.jks \
             --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
             --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
             --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
