@@ -11,19 +11,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Step 1: Decode Keystore from base64
+      # Шаг 1: Установка Java (Добавь этот шаг)
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'  # или '11', '21'
+
+      # Шаг 2: Декодирование Keystore из base64
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.jks
-
-      # Step 2: Build Release APK using Buildozer
+          
+      # Шаг 3: Сборка APK через Buildozer
       - name: Build Release APK
         uses: digreatbrian/buildozer-action@v2
         with:
           python-version: 3.11
           buildozer-cmd: buildozer -v android release
 
-      # Step 3: Sign the APK manually with .jks keystore
+      # Шаг 4: Подписание APK
       - name: Sign the APK manually
         run: |
           APK_PATH=$(find ./bin -name "*-release-unsigned.apk" | head -n 1)
@@ -32,18 +39,17 @@ jobs:
             -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
             -keypass "${{ secrets.KEY_PASSWORD }}" \
             "$APK_PATH" "${{ secrets.KEY_ALIAS }}"
-
-      # Step 4: Rename the signed APK
+            
+      # Шаг 5: Переименование APK
       - name: Rename the signed APK
         run: |
           APK_PATH=$(find ./bin -name "*-release-unsigned.apk" | head -n 1)
           NEW_APK_PATH="${APK_PATH/-unsigned/-signed}"
           mv "$APK_PATH" "$NEW_APK_PATH"
-
-      # Step 5: Upload Signed APK Artifact
+          
+      # Шаг 6: Загрузка артефакта
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: signed-release-apk
           path: ./bin/*-release-signed.apk
-
