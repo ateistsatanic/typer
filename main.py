@@ -1,479 +1,271 @@
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.textinput import TextInput
+from kivy.clock import Clock
+from kivy.core.window import Window
+from kivy.uix.floatlayout import FloatLayout
+from kivy.graphics import Color, Rectangle
 import time
 import random
-from pynput import keyboard, mouse
-from pynput.keyboard import Key, Controller
-from pynput.mouse import Button
-import pyperclip
-from pathlib import Path
-import os
 import threading
-import sys
-import base64
-from kivy.uix.filechooser import FileChooserListView
-from kivy.uix.image import Image
-import pyperclipimg as pci
-import win32gui
-import win32con
-import keyboard as kb_global
+
 try:
-    from android.permissions import request_permissions, Permission
-    from android.storage import app_storage_path
-    HAS_ANDROID = True
+    from jnius import autoclass, cast
+    PythonActivity = autoclass('org.kivy.android.PythonActivity')
+    Context = autoclass('android.content.Context')
+    WindowManager = autoclass('android.view.WindowManager')
+    LayoutParams = autoclass('android.view.WindowManager$LayoutParams')
+    Gravity = autoclass('android.view.Gravity')
+    ANDROID_VERSION = True
 except:
-    HAS_ANDROID = False
+    ANDROID_VERSION = False
 
-class MobileTyper:
+class SimpleTyper:
     def __init__(self):
-        # ... остальной код ...
-        if HAS_ANDROID:
-            self.request_android_permissions()
+        self.running = False
+        self.wpm = 193
+        self.text_to_type = ""
     
-    def request_android_permissions(self):
-        """Запрашивает разрешения на Android"""
-        try:
-            request_permissions([
-                Permission.READ_EXTERNAL_STORAGE,
-                Permission.WRITE_EXTERNAL_STORAGE,
-                Permission.CAMERA,
-                Permission.INTERNET
-            ])
-        except:
-            pass
-
-kb = Controller()
-mouse_listener = None
-keyboard_listener = None
-
-running = False
-mode = None
-wpm = 193
-words_list = []  # Основной список слов из messages.txt
-words_list_2 = []  # Второй список слов
-words_list_3 = []  # Третий список слов
-photo_path = None
-
-last_words = []
-
-def on_mouse_click(x, y, button, pressed):
-    """Обработка кликов мыши"""
-    global running
+    def calculate_char_delay(self, wpm):
+        """Рассчитывает задержку между символами"""
+        return 60.0 / (wpm * 5)
     
-    if not pressed:  # Обрабатываем только отпускание кнопки
-        return
-    
-    if button == Button.x2:  # 5-я кнопка мыши (боковая вперед)
-        if not running:
-            print("Запуск (5-я кнопка мыши).")
-            running = True
-            thread = threading.Thread(target=worker, daemon=True)
-            thread.start()
-        else:
-            print("Уже запущено.")
-    
-    elif button == Button.middle:  # 3-я кнопка мыши (колесо)
-        print("Аварийный выход (3-я кнопка мыши).")
-        os._exit(0)
-
-def on_key_release(key):
-    """Обработка отпускания клавиш"""
-    global running
-    
-    try:
-        # Проверяем Tab
-        if key == Key.tab:
-            if running:
-                print("Остановка (Tab).")
-                running = False
-            else:
-                print("Не запущено.")
-    except AttributeError:
-        pass
-        
-def select_photo_android(self):
-        """Выбор фото на Android"""
-        try:
-            from android import mActivity
-            from jnius import autoclass
-            
-            Intent = autoclass('android.content.Intent')
-            Uri = autoclass('android.net.Uri')
-            
-            intent = Intent(Intent.ACTION_PICK)
-            intent.setType("image/*")
-            
-            mActivity.startActivityForResult(intent, 100)
-            return True
-        except:
-            return False
-            
-def calculate_char_delay(wpm):
-    """Рассчитывает задержку между символами на основе WPM"""
-    return 60.0 / (wpm * 5)
-
-def type_text(text, wpm):
-    """Печатает текст с естественной скоростью"""
-    if not text:
-        return
-    
-    char_delay = calculate_char_delay(wpm)
-    
-    for i, char in enumerate(text):
-        kb.press(char)
-        kb.release(char)
-        
-        if i < len(text) - 1:
-            current_delay = char_delay * random.uniform(0.9, 1.1)
-            time.sleep(max(0.001, current_delay))
-
-def type_word(word, wpm):
-    """Печатает слово и нажимает Enter"""
-    type_text(word, wpm)
-    time.sleep(0.02)
-    kb.press(Key.enter)
-    kb.release(Key.enter)
-
-def type_words_separately(sentence, wpm):
-    """Печатает каждое слово из предложения отдельным сообщением с возможными ошибками"""
-    words = sentence.split()
-    for word in words:
-        if word.strip():  # Проверяем, что слово не пустое
-            # 60% вероятность сделать ошибку в слове
-            if random.random() < 0.60:
-                word_with_errors = add_errors_to_word(word)
-                type_word(word_with_errors, wpm)
-                print(f"Печать с ошибкой: {word_with_errors} (оригинал: {word})")
-            else:
-                type_word(word, wpm)
-            
-            # Случайная пауза между словами
-            time.sleep(random.uniform(0.06, 0.03))
-
-def add_errors_to_word(word):
-    """Добавляет ошибки в слово с различными типами опечаток (только русские буквы)"""
-    print(f"  Обработка слова: '{word}'")
-    
-    if len(word) <= 1:
-        print(f"  Слово слишком короткое, возвращаем оригинал")
-        return word
-    
-    error_type = random.choice(['swap', 'extra', 'missing', 'wrong'])
-    print(f"  Выбран тип ошибки: {error_type}")
-    
-    # Русские буквы для ошибок
-    russian_letters = 'абвгджзыц'
-    
-    if error_type == 'swap' and len(word) >= 3:
-        # Поменять две буквы местами
-        pos = random.randint(0, len(word) - 2)
-        chars = list(word)
-        chars[pos], chars[pos + 1] = chars[pos + 1], chars[pos]
-        result = ''.join(chars)
-        print(f"  Swap: позиция {pos}, '{word}' -> '{result}'")
-        return result
-    
-    elif error_type == 'extra' and len(word) >= 2:
-        # Добавить лишнюю букву (русскую)
-        pos = random.randint(0, len(word) - 1)
-        extra_char = random.choice(russian_letters)
-        result = word[:pos] + extra_char + word[pos:]
-        print(f"  Extra: позиция {pos}, символ '{extra_char}', '{word}' -> '{result}'")
-        return result
-    
-    elif error_type == 'missing' and len(word) >= 3:
-        # Пропустить букву
-        pos = random.randint(1, len(word) - 2)
-        result = word[:pos] + word[pos + 1:]
-        print(f"  Missing: позиция {pos}, '{word}' -> '{result}'")
-        return result
-    
-    elif error_type == 'wrong' and len(word) >= 2:
-        # Неправильная буква (русская)
-        pos = random.randint(0, len(word) - 1)
-        wrong_char = random.choice(russian_letters)
-        result = word[:pos] + wrong_char + word[pos + 1:]
-        print(f"  Wrong: позиция {pos}, символ '{wrong_char}', '{word}' -> '{result}'")
-        return result
-    
-    # Если не удалось применить ошибку (слишком короткое слово), возвращаем оригинал
-    print(f"  Не удалось применить ошибку, возвращаем оригинал")
-    return word
-
-def type_random_words_separately():
-    """Печатает каждое слово отдельным сообщением с ошибками"""
-    words = get_random_words()
-    if words and words.strip():
-        print(f"Печать слов отдельно: {words}")
-        type_words_separately(words, wpm)
-
-
-def simple_word_error(word):
-    """Простая гарантированная ошибка в слове"""
-    
-    # Выбираем случайную позицию для ошибки
-    pos = random.randint(0, len(word) - 1)
-    
-    # Простые типы ошибок
-    error_type = random.choice(['double', 'remove', 'replace'])
-    
-    if error_type == 'double':
-        # Дублируем букву
-        return word[:pos] + word[pos] + word[pos:]
-    
-    elif error_type == 'remove':
-        # Удаляем букву
-        return word[:pos] + word[pos+1:]
-    
-    elif error_type == 'replace':
-        # Заменяем букву на случайную
-        new_char = random.choice('абвдеийклнопрстчш')
-        return word[:pos] + new_char + word[pos+1:]
-    
-
-def add_errors_to_sentence(sentence):
-    """Добавляет ошибки к словам в предложении с разной вероятностью"""
-    words = sentence.split()
-    result_words = []
-    
-    for i, word in enumerate(words):
-        if i == 0:  # Первое слово - гарантированная ошибка
-            messed_word = simple_word_error(word)
-            result_words.append(messed_word)
-            print(f"Гарантированная ошибка в первом слове: '{word}' -> '{messed_word}'")
-        else:  # Остальные слова - 50% шанс
-            if random.random() < 0.3:
-                messed_word = simple_word_error(word)
-                result_words.append(messed_word)
-                print(f"Ошибка в слове {i+1}: '{word}' -> '{messed_word}'")
-            else:
-                result_words.append(word)
-                print(f"Без ошибки в слове {i+1}: '{word}'")
-    
-    return " ".join(result_words)
-
-def type_random_words():
-    """Печатает сообщение целиком с ошибками"""
-    words = get_random_words()
-    if words and words.strip():
-        print(f"Исходный текст: {words}")
-        
-        chance = random.random()
-        if chance < 0.75:  # 60% шанс на ошибки
-            print("Выпали ошибки! (60% шанс)")
-            error_text = add_errors_to_sentence(words)
-            print(f"Текст с ошибками: {error_text}")
-            type_word(error_text, wpm)
-        else:  # 40% шанс без ошибок
-            print("Без ошибок (40% шанс)")
-            type_word(words, wpm)
-
-def get_random_words():
-    """Возвращает случайное количество слов от 1 до 3"""
-    global words_list, words_list_2, words_list_3, last_words
-    
-    # Определяем количество слов (1, 2 или 3)
-    word_count = random.randint(1, 3)
-    
-    # 15% шанс на местоимение "ты"
-    use_pronoun = random.random() < 0.1
-    
-    result_words = []
-    words_list_4 = open('messages.txt' ,'r', encoding='utf-8').read().split('\n')
-    if use_pronoun:
-        # "ты" + случайное слово из основного списка
-        if words_list:
-            word = random.choice(words_list_4)
-            result_words.append(word)
-    
-    else:
-        # Обычный режим
-        if word_count == 1 and words_list:
-            result_words.append(random.choice(words_list_4))
-        
-        if word_count >= 2 and words_list_2:
-            result_words.append(random.choice(words_list))
-            result_words.append(random.choice(words_list_2))
-        
-        if word_count >= 3 and words_list_3:
-            result_words.append(random.choice(words_list_3))
-    
-    # Если ничего не выбралось, используем слово из основного списка
-    if not result_words and words_list:
-        result_words.append(random.choice(words_list))
-    
-    final_text = " ".join(result_words)
-    
-    # Защита от повторов
-    if final_text in last_words:
-        # Если текст повторяется, генерируем заново
-        return get_random_words()
-    
-    last_words.append(final_text)
-    if len(last_words) > 5:
-        last_words.pop(0)
-    
-    return final_text
-
-
-def send_photo_with_text():
-    global photo_path, wpm
-    if not photo_path:
-        print("Путь до фото не указан.")
-        return
-        
-    photo_file = Path(photo_path)
-    if not photo_file.is_file():
-        photo_file = Path(os.getcwd()) / photo_file.name
-        if not photo_file.is_file():
-            print(f"Фото {photo_path} не найдено.")
+    def type_text(self):
+        """Эмуляция печати текста"""
+        if not self.text_to_type:
             return
+        
+        char_delay = self.calculate_char_delay(self.wpm)
+        
+        # Эмуляция печати
+        for i, char in enumerate(self.text_to_type):
+            if not self.running:
+                break
+            time.sleep(max(0.001, char_delay * random.uniform(0.9, 1.1)))
+    
+    def start_typing(self):
+        """Запускает печать"""
+        self.running = True
+        self.type_text()
+        self.running = False
+    
+    def stop_typing(self):
+        """Останавливает печать"""
+        self.running = False
 
-    try:
-        # Копируем фото
-        pci.copy(photo_file)
-        # Минимальная задержка для гарантии копирования
-        time.sleep(0.05)
+class AndroidOverlay(FloatLayout):
+    def __init__(self, main_app, **kwargs):
+        super().__init__(**kwargs)
+        self.main_app = main_app
         
-        # Вставляем фото
-        with kb.pressed(Key.ctrl):
-            kb.press('v')
-            kb.release('v')
+        # Размер и позиция
+        self.size_hint = (None, None)
+        self.size = (300, 100)
+        self.pos_hint = {'top': 0.95, 'right': 0.98}
         
-        # Минимальная задержка перед текстом
-        time.sleep(0.05)
+        # Полупрозрачный фон
+        with self.canvas.before:
+            Color(0.1, 0.1, 0.1, 0.9)
+            self.rect = Rectangle(pos=self.pos, size=self.size)
         
-        # Печатаем текст
-        word = get_random_words()
-        if word and word.strip():
-            type_word(word, wpm)
-            
-    except Exception as e:
-        print(f"Ошибка: {e}")
+        # Контролы
+        controls_layout = BoxLayout(orientation='horizontal', padding=10)
+        
+        self.status_label = Label(
+            text='Печатаем...',
+            color=(1, 1, 1, 1),
+            size_hint_x=0.6
+        )
+        
+        self.stop_btn = Button(
+            text='⏹️ СТОП',
+            background_color=(0.8, 0, 0, 1),
+            size_hint_x=0.4
+        )
+        self.stop_btn.bind(on_press=self.stop_typing)
+        
+        controls_layout.add_widget(self.status_label)
+        controls_layout.add_widget(self.stop_btn)
+        self.add_widget(controls_layout)
+        
+        self.bind(pos=self.update_rect, size=self.update_rect)
+    
+    def update_rect(self, *args):
+        self.rect.pos = self.pos
+        self.rect.size = self.size
+    
+    def stop_typing(self, instance):
+        self.main_app.stop_typing()
 
-def worker():
-    global running, mode
-    while running:
+class TyperApp(App):
+    def build(self):
+        self.typer = SimpleTyper()
+        self.typing_thread = None
+        self.overlay = None
+        self.overlay_window = None
+        
+        # Главный layout
+        self.main_layout = BoxLayout(orientation='vertical', padding=20, spacing=15)
+        
+        # Заголовок
+        title = Label(
+            text='ПРОСТОЙ ТАЙПЕР\n(Android Overlay)',
+            font_size='24sp',
+            bold=True,
+            halign='center',
+            size_hint_y=0.15
+        )
+        
+        # Поле для WPM
+        wpm_layout = BoxLayout(orientation='horizontal', size_hint_y=0.1)
+        wpm_layout.add_widget(Label(text='Скорость (WPM):', size_hint_x=0.5))
+        self.wpm_input = TextInput(
+            text='193',
+            multiline=False,
+            input_filter='int',
+            size_hint_x=0.5
+        )
+        wpm_layout.add_widget(self.wpm_input)
+        
+        # Поле для текста
+        text_layout = BoxLayout(orientation='vertical', size_hint_y=0.6)
+        text_layout.add_widget(Label(text='Текст для печати:', size_hint_y=0.1))
+        self.text_input = TextInput(
+            text='Привет! Это тестовый текст для тайпера.',
+            multiline=True,
+            size_hint_y=0.9
+        )
+        text_layout.add_widget(self.text_input)
+        
+        # Кнопка старт
+        self.start_btn = Button(
+            text='🚀 НАЧАТЬ ПЕЧАТАТЬ',
+            size_hint_y=0.15,
+            background_color=(0, 0.7, 0, 1)
+        )
+        self.start_btn.bind(on_press=self.start_typing)
+        
+        # Инфо о overlay
+        info_label = Label(
+            text='После запуска появится оверлей поверх всех приложений',
+            font_size='12sp',
+            halign='center',
+            size_hint_y=0.1
+        )
+        
+        self.main_layout.add_widget(title)
+        self.main_layout.add_widget(wpm_layout)
+        self.main_layout.add_widget(text_layout)
+        self.main_layout.add_widget(self.start_btn)
+        self.main_layout.add_widget(info_label)
+        
+        return self.main_layout
+    
+    def create_android_overlay(self):
+        """Создает настоящий Android overlay поверх всех приложений"""
+        if not ANDROID_VERSION:
+            # Fallback для Windows/тестирования
+            self.overlay = AndroidOverlay(self)
+            Window.add_widget(self.overlay)
+            return
+        
         try:
-            if mode == 1:
-                type_random_words()  # Сообщение целиком с ошибками
-            elif mode == 2:
-                send_photo_with_text()
-            elif mode == 3:
-                type_random_words_separately()  # Каждое слово отдельно с ошибками
+            # Создаем overlay через Android WindowManager
+            activity = PythonActivity.mActivity
+            context = activity.getApplicationContext()
+            window_manager = cast(WindowManager, context.getSystemService(Context.WINDOW_SERVICE))
             
-            # Пауза между сообщениями
-            time.sleep(0.001)
+            # Параметры окна для overlay
+            layout_params = LayoutParams()
+            layout_params.type = LayoutParams.TYPE_APPLICATION_OVERLAY
+            layout_params.flags = (LayoutParams.FLAG_NOT_FOCUSABLE | 
+                                 LayoutParams.FLAG_NOT_TOUCH_MODAL)
+            layout_params.format = -3  # TRANSPARENT
+            layout_params.gravity = Gravity.TOP | Gravity.END
+            layout_params.width = 300
+            layout_params.height = 100
+            layout_params.x = 0
+            layout_params.y = 0
+            
+            # Создаем Kivy виджет
+            self.overlay = AndroidOverlay(self)
+            
+            # Добавляем в WindowManager
+            window_manager.addView(self.overlay, layout_params)
+            
         except Exception as e:
-            print(f"Ошибка в worker: {e}")
-            time.sleep(1)
-
-def load_word_list(filename):
-    """Загружает список слов из файла"""
-    try:
-        if not os.path.exists(filename):
-            print(f"Файл {filename} не существует")
-            return []
+            print(f"Ошибка создания Android overlay: {e}")
+            # Fallback
+            self.overlay = AndroidOverlay(self)
+            Window.add_widget(self.overlay)
+    
+    def remove_android_overlay(self):
+        """Убирает Android overlay"""
+        if self.overlay:
+            if ANDROID_VERSION and hasattr(self.overlay, 'getParent'):
+                try:
+                    activity = PythonActivity.mActivity
+                    context = activity.getApplicationContext()
+                    window_manager = cast(WindowManager, context.getSystemService(Context.WINDOW_SERVICE))
+                    window_manager.removeView(self.overlay)
+                except:
+                    Window.remove_widget(self.overlay)
+            else:
+                Window.remove_widget(self.overlay)
+            self.overlay = None
+    
+    def start_typing(self, instance):
+        """Запускает процесс печати"""
+        try:
+            wpm = max(40, min(int(self.wpm_input.text), 300))
+            text = self.text_input.text.strip()
             
-        with open(filename, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-        
-        words = [line.strip() for line in content.split("\n") if line.strip()]
-        print(f"Загружено {len(words)} слов из {filename}")
-        return words
-        
-    except Exception as e:
-        print(f"Ошибка чтения {filename}: {e}")
-        return []
-
-def main():
-    global mode, wpm, words_list, words_list_2, words_list_3, photo_path
-    global mouse_listener, keyboard_listener
+            if not text:
+                return
+            
+            self.typer.wpm = wpm
+            self.typer.text_to_type = text
+            
+            self.start_btn.disabled = True
+            self.wpm_input.disabled = True
+            self.text_input.disabled = True
+            
+            # Создаем overlay
+            self.create_android_overlay()
+            
+            # Запускаем печать
+            self.typing_thread = threading.Thread(target=self.typer.start_typing, daemon=True)
+            self.typing_thread.start()
+            
+            Clock.schedule_interval(self.check_typing, 0.1)
+            
+        except Exception as e:
+            print(f'Ошибка: {e}')
     
-    print("=" * 50)
-    print("АВТОТАЙПЕР v2.0")
-    print("=" * 50)
+    def stop_typing(self, instance=None):
+        """Останавливает печать"""
+        self.typer.stop_typing()
+        self.reset_ui()
     
-    choice = input("Выберите режим:\n1 - автотайпер из текстовых файлов\n2 - отправка фото и текста\n3 - отправка слов по отдельности\nВведите 1, 2 или 3: ").strip()
+    def check_typing(self, dt):
+        """Проверяет статус печати"""
+        if not self.typer.running and self.overlay:
+            if hasattr(self.overlay, 'status_label'):
+                self.overlay.status_label.text = 'Завершено!'
+            Clock.schedule_once(lambda dt: self.reset_ui(), 1.0)
+            return False
+        return True
     
-    if choice == '1':
-        mode = 1
-        print("Режим: автотайпер (предложения)")
-        
-    elif choice == '2':
-        mode = 2
-        print("Режим: отправка фото + текст")
-        photo_path = input("Введите полный путь до фото файла: ").strip()
-        
-    elif choice == '3':
-        mode = 3
-        print("Режим: отправка слов по отдельности")
-        
-    else:
-        print("Неверный выбор.")
-        return
-    
-    # Загружаем слова из всех файлов
-    words_list = load_word_list("messages1.txt")
-    words_list_2 = load_word_list("messages2.txt")
-    words_list_3 = load_word_list("messages3.txt")
-    words_list_4 = load_word_list("messages.txt")
-    
-    # Проверяем, что есть хотя бы один файл с словами
-    if not any([words_list, words_list_2, words_list_3]):
-        print("Ошибка: нет загруженных слов! Создайте файлы:")
-        print("- messages.txt (обязательный)")
-        print("- messages2.txt (опциональный)")
-        print("- messages3.txt (опциональный)")
-        return
+    def reset_ui(self):
+        """Восстанавливает UI"""
+        self.remove_android_overlay()
+        self.start_btn.disabled = False
+        self.wpm_input.disabled = False
+        self.text_input.disabled = False
+        Clock.unschedule(self.check_typing)
 
-    # Настройка скорости
-    try:
-        wpm_input = input("Введите скорость печати (40-300, по умолчанию 193): ").strip()
-        if wpm_input:
-            wpm = max(40, min(int(wpm_input), 300))
-        print(f"Скорость печати: {wpm} WPM")
-    except:
-        wpm = 193
-        print("Установлена скорость по умолчанию: 193 WPM")
-
-    # Скрытие консоли
-    try:
-        hwnd = win32gui.GetForegroundWindow()
-        win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
-    except:
-        print("Не удалось скрыть окно (возможно, не Windows)")
-
-    # Запуск слушателей мыши и клавиатуры
-    mouse_listener = mouse.Listener(on_click=on_mouse_click)
-    keyboard_listener = keyboard.Listener(on_release=on_key_release)
-    
-    mouse_listener.start()
-    keyboard_listener.start()
-
-    print("\n" + "=" * 50)
-    print("СКРИПТ ЗАПУЩЕН!")
-    print("Управление:")
-    print("5-я кнопка мыши (боковая вперед) - Старт")
-    print("Tab - Стоп") 
-    print("3-я кнопка мыши (колесо) - Аварийный выход")
-    print("=" * 50)
-    print("Перед началом убедитесь, что:")
-    print("1. Активно окно чата/сообщений")
-    print("2. Курсор находится в поле ввода")
-    print("3. Раскладка клавиатуры - английская")
-    print("=" * 50)
-
-    # Ожидание завершения потоков
-    try:
-        mouse_listener.join()
-        keyboard_listener.join()
-    except KeyboardInterrupt:
-        print("\nЗавершение работы...")
-    finally:
-        if mouse_listener:
-            mouse_listener.stop()
-        if keyboard_listener:
-            keyboard_listener.stop()
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    TyperApp().run()
 
