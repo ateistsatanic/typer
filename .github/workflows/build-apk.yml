@@ -11,41 +11,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Шаг 1: Установка Java (Добавь этот шаг)
+      # Шаг 1: Установка Java
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'  # или '11', '21'
+          java-version: '17'
 
-      # Шаг 2: Декодирование Keystore из base64
+      # Шаг 2: Установка Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Шаг 3: Декодирование Keystore из base64
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.jks
           
-      # Шаг 3: Сборка APK через Buildozer
+      # Шаг 4: Сборка APK через Buildozer
       - name: Build Release APK
         uses: digreatbrian/buildozer-action@v2
         with:
           python-version: 3.11
           buildozer-cmd: buildozer -v android release
 
-      # Шаг 4: Подписание APK
-      - name: Sign the APK manually
+      # Шаг 5: Подписание APK через apksigner (ЗАМЕНИЛИ ЭТОТ ШАГ)
+      - name: Sign the APK with apksigner
         run: |
+          # Находим последнюю версию build-tools
+          BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools -type d | sort -V | tail -n1)
+          echo "Using build-tools: $BUILD_TOOLS_DIR"
+          
           APK_PATH=$(find ./bin -name "*-release-unsigned.apk" | head -n 1)
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
-            -keystore android.jks \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_PASSWORD }}" \
-            "$APK_PATH" "${{ secrets.KEY_ALIAS }}"
-            
-      # Шаг 5: Переименование APK
-      - name: Rename the signed APK
-        run: |
-          APK_PATH=$(find ./bin -name "*-release-unsigned.apk" | head -n 1)
-          NEW_APK_PATH="${APK_PATH/-unsigned/-signed}"
-          mv "$APK_PATH" "$NEW_APK_PATH"
+          SIGNED_APK_PATH="${APK_PATH/-unsigned/-signed}"
+          
+          echo "Signing APK: $APK_PATH"
+          echo "Output: $SIGNED_APK_PATH"
+          
+          # Подписываем через apksigner
+          $BUILD_TOOLS_DIR/apksigner sign \
+            --ks android.jks \
+            --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --out "$SIGNED_APK_PATH" \
+            "$APK_PATH"
+          
+          echo "Verifying signature..."
+          $BUILD_TOOLS_DIR/apksigner verify --verbose "$SIGNED_APK_PATH"
           
       # Шаг 6: Загрузка артефакта
       - name: Upload Signed APK Artifact
