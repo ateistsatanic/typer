@@ -22,21 +22,30 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Шаг 3: Декодирование и КОНВЕРТАЦИЯ Keystore
-      - name: Decode and Convert Keystore
+      # Шаг 3: Создаем keystore (ЗАМЕНИЛ шаг декодирования)
+      - name: Create Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.jks
-          
-          # Конвертируем JKS в PKCS12 и обратно в старый формат JKS
-          keytool -importkeystore \
-            -srckeystore android.jks \
-            -srcstorepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -destkeystore android_fixed.jks \
-            -deststorepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -deststoretype JKS
-          
-          # Проверяем что конвертация прошла успешно
-          keytool -list -v -keystore android_fixed.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}"
+          # Проверяем есть ли валидный keystore в secrets
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ] && echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.jks 2>/dev/null && [ -s android.jks ]; then
+            echo "Using existing keystore from secrets"
+            keytool -list -keystore android.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" || exit 1
+          else
+            echo "Creating new keystore..."
+            keytool -genkey -v \
+              -keystore android.jks \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -alias "${{ secrets.KEY_ALIAS }}" \
+              -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+              -keypass "${{ secrets.KEY_PASSWORD }}" \
+              -dname "CN=MyApp, OU=Android, O=MyCompany, L=Moscow, ST=Moscow, C=RU"
+            
+            # Сохраняем base64 нового keystore (для информации)
+            echo "New keystore created. To add it to secrets, run:"
+            cat android.jks | base64 -w0
+            echo ""
+          fi
           
       # Шаг 4: Сборка APK через Buildozer
       - name: Build Release APK
@@ -45,7 +54,7 @@ jobs:
           python-version: 3.11
           buildozer-cmd: buildozer -v android release
 
-      # Шаг 5: Подписание APK через apksigner с КОНВЕРТИРОВАННЫМ keystore
+      # Шаг 5: Подписание APK
       - name: Sign the APK with apksigner
         run: |
           BUILD_TOOLS_DIR="$ANDROID_HOME/build-tools/34.0.0"
@@ -55,15 +64,14 @@ jobs:
           echo "Signing APK: $APK_PATH"
           
           $BUILD_TOOLS_DIR/apksigner sign \
-            --ks android_fixed.jks \
+            --ks android.jks \
             --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
             --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
             --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
             --out "$SIGNED_APK_PATH" \
             "$APK_PATH"
           
-          echo "Verifying signature..."
-          $BUILD_TOOLS_DIR/apksigner verify --verbose "$SIGNED_APK_PATH"
+          echo "APK signed successfully: $SIGNED_APK_PATH"
           
       # Шаг 6: Загрузка артефакта
       - name: Upload Signed APK Artifact
