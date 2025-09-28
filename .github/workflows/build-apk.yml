@@ -2,19 +2,19 @@ name: Build APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
@@ -23,26 +23,11 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          git \
-          unzip \
-          openjdk-11-jdk \
-          autoconf \
-          automake \
-          build-essential \
-          ccache \
-          libffi-dev \
-          libltdl-dev \
-          libssl-dev \
-          libtool \
-          patch \
-          pkg-config \
-          python3-pip \
-          python3-setuptools \
-          sudo \
-          swig \
-          wget \
-          zip \
-          zlib1g-dev
+          git zip unzip openjdk-11-jdk \
+          autoconf automake build-essential ccache \
+          libffi-dev libltdl-dev libssl-dev libtool \
+          patch pkg-config python3-pip python3-setuptools \
+          sudo swig wget zip zlib1g-dev
 
     - name: Install Buildozer
       run: |
@@ -51,14 +36,14 @@ jobs:
 
     - name: Build APK with Buildozer
       run: |
-        buildozer android debug
+        buildozer init
+        buildozer -v android debug
       env:
-        # Увеличиваем память для компиляции
         JAVA_OPTS: "-Xmx2048m"
 
-    - name: Upload APK artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Android-APK
+        name: android-apk
         path: bin/*.apk
         retention-days: 7
