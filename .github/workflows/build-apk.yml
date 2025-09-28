@@ -18,9 +18,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Шаг 2: Установка Android SDK
-      - name: Setup Android SDK
+      # Шаг 2: Установка Android SDK и build-tools
+      - name: Setup Android SDK and Build Tools
         uses: android-actions/setup-android@v3
+        with:
+          build-tools-version: "34.0.0"  # Явно указываем версию
 
       # Шаг 3: Декодирование Keystore из base64
       - name: Decode Keystore
@@ -34,11 +36,11 @@ jobs:
           python-version: 3.11
           buildozer-cmd: buildozer -v android release
 
-      # Шаг 5: Подписание APK через apksigner (ЗАМЕНИЛИ ЭТОТ ШАГ)
+      # Шаг 5: Подписание APK через apksigner (ИСПРАВЛЕННЫЙ ВАРИАНТ)
       - name: Sign the APK with apksigner
         run: |
-          # Находим последнюю версию build-tools
-          BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools -type d | sort -V | tail -n1)
+          # Правильный путь к build-tools
+          BUILD_TOOLS_DIR="$ANDROID_HOME/build-tools/34.0.0"
           echo "Using build-tools: $BUILD_TOOLS_DIR"
           
           APK_PATH=$(find ./bin -name "*-release-unsigned.apk" | head -n 1)
