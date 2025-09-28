@@ -17,11 +17,18 @@ android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,READ
 # Настройки Android
 android.api = 33
 android.minapi = 21
+android.sdk = 28
 android.ndk = 25b
 
 # Дополнительные настройки
 android.allow_backup = true
 
+# Ключ для подписи (debug)
+android.accept_sdk_license = True
+
 [buildozer]
 warn_on_root = 0
+log_level = 2
+
+# Оптимизация для CI
 log_level = 2
