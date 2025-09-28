@@ -1,68 +1,49 @@
-name: Build APK
+name: Build Signed APK
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    
+    runs-on: ubuntu-22.04
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+      # Step 1: Decode Keystore from base64
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android.jks
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          git zip unzip openjdk-11-jdk \
-          autoconf automake build-essential ccache \
-          libffi-dev libltdl-dev libssl-dev libtool \
-          patch pkg-config python3-pip python3-setuptools \
-          sudo swig wget zip zlib1g-dev
+      # Step 2: Build Release APK using Buildozer
+      - name: Build Release APK
+        uses: digreatbrian/buildozer-action@v2
+        with:
+          python-version: 3.11
+          buildozer-cmd: buildozer -v android release
 
-    - name: Install Buildozer
-      run: |
-        pip install --upgrade pip
-        pip install buildozer cython virtualenv
+      # Step 3: Sign the APK manually with .jks keystore
+      - name: Sign the APK manually
+        run: |
+          APK_PATH=$(find ./bin -name "*-release-unsigned.apk" | head -n 1)
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore android.jks \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -keypass "${{ secrets.KEY_PASSWORD }}" \
+            "$APK_PATH" "${{ secrets.KEY_ALIAS }}"
 
-    - name: Validate buildozer.spec
-      run: |
-        # Проверка синтаксиса файла
-        python -c "
-        from configparser import ConfigParser
-        config = ConfigParser()
-        files = config.read('buildozer.spec')
-        if files:
-            print('✅ buildozer.spec loaded successfully')
-            for section in config.sections():
-                print(f'Section: {section}')
-                for key in config[section]:
-                    print(f'  {key} = {config[section][key]}')
-        else:
-            print('❌ Failed to load buildozer.spec')
-            exit(1)
-        "
+      # Step 4: Rename the signed APK
+      - name: Rename the signed APK
+        run: |
+          APK_PATH=$(find ./bin -name "*-release-unsigned.apk" | head -n 1)
+          NEW_APK_PATH="${APK_PATH/-unsigned/-signed}"
+          mv "$APK_PATH" "$NEW_APK_PATH"
 
-    - name: Build APK
-      run: |
-        buildozer -v android debug
-      env:
-        JAVA_OPTS: "-Xmx2048m"
-        # Ускоряет сборку
-        BUILDODER_CACHE_DIR: "/tmp/buildozer_cache"
+      # Step 5: Upload Signed APK Artifact
+      - name: Upload Signed APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-release-apk
+          path: ./bin/*-release-signed.apk
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: android-apk
-        path: bin/*.apk
-        retention-days: 7
